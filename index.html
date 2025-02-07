@@ -40,6 +40,7 @@
             padding: 10px;
             margin-bottom: 10px;
             background: #fafafa;
+            text-align: left;
         }
 
         #messageInput {
@@ -76,6 +77,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyA_USvfSXAqZf7hQhJCon0WulnrrINB7cI",
             authDomain: "the-pic-c437e.firebaseapp.com",
+            databaseURL: "https://the-pic-c437e-default-rtdb.firebaseio.com",  // URL de la base de datos en tiempo real
             projectId: "the-pic-c437e",
             storageBucket: "the-pic-c437e.appspot.com",
             messagingSenderId: "750954597180",
@@ -104,23 +106,34 @@
         // Función para enviar mensajes
         window.sendMessage = function () {
             const messageInput = document.getElementById("messageInput");
-            if (messageInput.value.trim() !== "") {
-                push(messagesRef, {
-                    user: username,
-                    text: messageInput.value,
-                    timestamp: Date.now()
-                });
-                messageInput.value = "";
+            const text = messageInput.value.trim();
+            
+            if (text === "") return;
+            if (username === "") {
+                alert("Debes ingresar un nombre antes de enviar mensajes.");
+                return;
             }
+
+            push(messagesRef, {
+                user: username,
+                text: text,
+                timestamp: Date.now()
+            });
+
+            messageInput.value = "";
         };
 
         // Escuchar mensajes en tiempo real
         onChildAdded(messagesRef, (snapshot) => {
             const data = snapshot.val();
+            if (!data) return;
+
             const messagesDiv = document.getElementById("messages");
             const messageElement = document.createElement("p");
-            messageElement.textContent = `${data.user}: ${data.text}`;
+            messageElement.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
             messagesDiv.appendChild(messageElement);
+
+            // Auto-scroll hacia abajo al recibir nuevos mensajes
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         });
 
