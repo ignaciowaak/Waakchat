@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Chat iOS Style</title>
     <style>
         :root {
@@ -19,6 +19,7 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #userPrompt {
@@ -28,6 +29,8 @@
             border-radius: 14px;
             margin: auto;
             box-shadow: var(--ios-shadow);
+            width: 90%;
+            max-width: 400px;
         }
 
         #chat-container {
@@ -49,7 +52,7 @@
         }
 
         .message {
-            max-width: 70%;
+            max-width: 80%;
             padding: 12px 16px;
             border-radius: 18px;
             margin: 4px;
@@ -57,12 +60,18 @@
             backdrop-filter: var(--ios-blur);
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(0, 0, 0, 0.03);
+            transform-origin: bottom;
+            transition: transform 0.1s ease;
         }
 
         .message.sent {
             background: var(--ios-primary);
             color: white;
             align-self: flex-end;
+        }
+
+        .message:active {
+            transform: scale(0.98);
         }
 
         #input-container {
@@ -82,6 +91,12 @@
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.9);
             font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--ios-primary);
         }
 
         button {
@@ -140,13 +155,14 @@
             padding: 12px;
             border-radius: 18px;
             display: flex;
-            align-items: center;
+            flex-direction: column;
             gap: 10px;
+            width: 200px;
         }
 
         @keyframes messageIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from { transform: translateY(20px) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
         }
 
         @keyframes pulse {
@@ -154,16 +170,43 @@
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+
+        @media (max-width: 480px) {
+            #userPrompt {
+                padding: 1.5rem;
+                width: 85%;
+            }
+            
+            .message {
+                max-width: 85%;
+                padding: 10px 14px;
+            }
+            
+            #messageInput {
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            button {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+            
+            .mic-button {
+                width: 42px;
+                height: 42px;
+            }
+        }
     </style>
 </head>
 <body>
 
     <div id="userPrompt">
-        <h2 style="color: #1c1c1e; margin-bottom: 1rem;">Ingresa tu nombre</h2>
+        <h2 style="color: #1c1c1e; margin-bottom: 1rem; font-size: 1.2rem;">Ingresa tu nombre</h2>
         <input type="text" id="usernameInput" 
-               style="padding: 12px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1);"
+               style="padding: 12px; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.1); width: 100%;"
                placeholder="Tu nombre">
-        <button onclick="setUsername()" style="margin-top: 1rem;">Continuar</button>
+        <button onclick="setUsername()" style="margin-top: 1rem; width: 100%;">Continuar</button>
     </div>
 
     <div id="chat-container">
@@ -184,6 +227,15 @@
         <div class="recording-wave"></div>
         <span>Grabando... Desliza para cancelar</span>
     </div>
+
+    <!-- Sonidos iOS -->
+    <audio id="sendSound">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMQAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQAErZv7WPYHYVv2L7mh2UgcBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iE=" type="audio/mpeg">
+    </audio>
+    
+    <audio id="receiveSound">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMQAAAAAAAAAAAAAA//tAxAADB8AhSmxhIIEVCSiJrDCQAErZv7WPYHYVv2L7mh2UgcBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iEBBX2B4B0EDgIK+wPAOhv3cQlN/7iE=" type="audio/mpeg">
+    </audio>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
@@ -217,6 +269,10 @@
         const storage = getStorage(app);
         const messagesRef = ref(db, "messages");
 
+        // Elementos de sonido
+        const sendSound = document.getElementById('sendSound');
+        const receiveSound = document.getElementById('receiveSound');
+        
         let username = '';
         let mediaRecorder;
         let audioChunks = [];
@@ -231,6 +287,7 @@
                 document.getElementById('userPrompt').style.display = 'none';
                 document.getElementById('chat-container').style.display = 'flex';
                 initChat();
+                vibrate(50); // Vibración al ingresar nombre
             }
         };
 
@@ -238,6 +295,13 @@
             onChildAdded(messagesRef, (snapshot) => {
                 const data = snapshot.val();
                 displayMessage(data);
+                
+                // Sonido y vibración al recibir mensaje
+                if(data.user !== username) {
+                    receiveSound.currentTime = 0;
+                    receiveSound.play();
+                    vibrate([50, 50, 50]);
+                }
             });
         }
 
@@ -250,6 +314,7 @@
 
         async function startRecording(e) {
             e.preventDefault();
+            vibrate(50); // Vibración al iniciar grabación
             try {
                 document.getElementById('recordingIndicator').style.display = 'flex';
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -272,6 +337,11 @@
                             url: audioURL,
                             timestamp: serverTimestamp()
                         });
+                        
+                        // Efectos al enviar audio
+                        sendSound.currentTime = 0;
+                        sendSound.play();
+                        vibrate(30);
                     }
                     cleanupRecording();
                 };
@@ -292,6 +362,7 @@
                     <div style="color: #FF3B30; font-size: 24px;">✖</div>
                     <span>Suelta para cancelar</span>
                 `;
+                vibrate(100); // Vibración al cancelar
             }
         }
 
@@ -341,7 +412,12 @@
                         text: text,
                         timestamp: serverTimestamp()
                     });
+                    
+                    // Efectos al enviar
                     input.value = '';
+                    sendSound.currentTime = 0;
+                    sendSound.play();
+                    vibrate(30);
                 } catch (error) {
                     console.error("Error enviando mensaje:", error);
                 }
@@ -356,8 +432,9 @@
             
             if(data.type === 'audio') {
                 messageElement.innerHTML = `
+                    <strong>${data.user}</strong>
                     <div class="audio-message">
-                        <audio controls style="width: 200px;">
+                        <audio controls style="width: 100%;">
                             <source src="${data.url}" type="audio/mp3">
                         </audio>
                     </div>
@@ -385,6 +462,7 @@
                 try {
                     await remove(messagesRef);
                     document.getElementById('messages').innerHTML = '';
+                    vibrate(100);
                 } catch (error) {
                     console.error("Error borrando mensajes:", error);
                 }
@@ -398,7 +476,20 @@
                 sendMessage();
             }
         });
-    </script>
+
+        // Función de vibración
+        function vibrate(pattern) {
+            if(navigator.vibrate) {
+                navigator.vibrate(pattern);
+            }
+        }
+
+    // Asegurar responsive en móviles
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+    window.addEventListener('resize', () => {
+        document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+    });
+</script>
 
 </body>
 </html>
