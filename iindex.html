@@ -72,6 +72,7 @@
             display: flex;
             gap: 8px;
             backdrop-filter: var(--ios-blur);
+            align-items: center;
         }
 
         #messageInput {
@@ -101,17 +102,36 @@
         .mic-button {
             background: #007AFF;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.2s ease;
+            border: none;
         }
 
-        .mic-button.recording {
+        .recording-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 24px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .recording-wave {
+            width: 24px;
+            height: 24px;
             background: #FF3B30;
+            border-radius: 50%;
             animation: pulse 1.5s infinite;
         }
 
@@ -122,10 +142,6 @@
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .audio-player {
-            flex-grow: 1;
         }
 
         @keyframes messageIn {
@@ -158,12 +174,15 @@
         </div>
         <div id="messages"></div>
         <div id="input-container">
-            <div class="mic-button" id="micButton" ontouchstart="startRecording(event)" ontouchend="stopRecording()">
-                🎤
-            </div>
+            <button class="mic-button" id="micButton">🎤</button>
             <input type="text" id="messageInput" placeholder="iMessage" autocomplete="off">
             <button onclick="sendMessage()">Enviar</button>
         </div>
+    </div>
+
+    <div class="recording-indicator" id="recordingIndicator">
+        <div class="recording-wave"></div>
+        <span>Grabando... Desliza para cancelar</span>
     </div>
 
     <script type="module">
@@ -174,8 +193,14 @@
             push, 
             onChildAdded,
             serverTimestamp,
-            remove
+            remove 
         } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
+        import { 
+            getStorage, 
+            ref as storageRef,
+            uploadBytes,
+            getDownloadURL 
+        } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA_USvfSXAqZf7hQhJCon0WulnrrINB7cI",
@@ -189,12 +214,15 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const storage = getStorage(app);
         const messagesRef = ref(db, "messages");
 
         let username = '';
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let touchStartX = 0;
+        let shouldCancel = false;
 
         window.setUsername = function() {
             const input = document.getElementById('usernameInput').value.trim();
@@ -213,79 +241,109 @@
             });
         }
 
+        // Sistema de grabación
+        document.getElementById('micButton').addEventListener('touchstart', startRecording);
+        document.getElementById('micButton').addEventListener('mousedown', startRecording);
+        document.addEventListener('touchmove', handleTouchMove);
+        document.addEventListener('touchend', handleTouchEnd);
+        document.addEventListener('mouseup', handleMouseUp);
+
         async function startRecording(e) {
             e.preventDefault();
             try {
+                document.getElementById('recordingIndicator').style.display = 'flex';
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
                 mediaRecorder = new MediaRecorder(stream);
                 isRecording = true;
-                document.getElementById('micButton').classList.add('recording');
-                
-                mediaRecorder.ondataavailable = (e) => {
-                    audioChunks.push(e.data);
-                };
+                audioChunks = [];
+                touchStartX = e.touches ? e.touches[0].clientX : e.clientX;
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
                 
                 mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    await sendAudioMessage(audioBlob);
-                    audioChunks = [];
+                    if(!shouldCancel && audioChunks.length > 0) {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const audioURL = await uploadAudio(audioBlob);
+                        
+                        await push(messagesRef, {
+                            user: username,
+                            type: 'audio',
+                            url: audioURL,
+                            timestamp: serverTimestamp()
+                        });
+                    }
+                    cleanupRecording();
                 };
-                
+
                 mediaRecorder.start();
             } catch (err) {
-                alert('Necesitas permitir el acceso al micrófono');
+                alert('Debes permitir acceso al micrófono');
+                cleanupRecording();
             }
         }
 
-        function stopRecording() {
-            if (isRecording) {
-                mediaRecorder.stop();
-                document.getElementById('micButton').classList.remove('recording');
-                isRecording = false;
+        function handleTouchMove(e) {
+            if(!isRecording) return;
+            const touch = e.touches[0];
+            if(Math.abs(touch.clientX - touchStartX) > 50) {
+                shouldCancel = true;
+                document.getElementById('recordingIndicator').innerHTML = `
+                    <div style="color: #FF3B30; font-size: 24px;">✖</div>
+                    <span>Suelta para cancelar</span>
+                `;
             }
         }
 
-        async function sendAudioMessage(audioBlob) {
+        function handleTouchEnd() {
+            if(!isRecording) return;
+            mediaRecorder.stop();
+        }
+
+        function handleMouseUp() {
+            if(!isRecording) return;
+            mediaRecorder.stop();
+        }
+
+        async function uploadAudio(blob) {
             try {
-                const audioURL = URL.createObjectURL(audioBlob);
-                const duration = await getAudioDuration(audioBlob);
-                
-                await push(messagesRef, {
-                    user: username,
-                    type: 'audio',
-                    url: audioURL,
-                    duration: duration,
-                    timestamp: serverTimestamp()
-                });
+                const audioRef = storageRef(storage, `audios/${Date.now()}.mp3`);
+                await uploadBytes(audioRef, blob);
+                return await getDownloadURL(audioRef);
             } catch (error) {
-                console.error('Error enviando audio:', error);
+                console.error("Error subiendo audio:", error);
+                return null;
             }
         }
 
-        function getAudioDuration(blob) {
-            return new Promise((resolve) => {
-                const audio = new Audio();
-                audio.src = URL.createObjectURL(blob);
-                audio.onloadedmetadata = () => {
-                    resolve(Math.round(audio.duration));
-                };
-            });
+        function cleanupRecording() {
+            isRecording = false;
+            shouldCancel = false;
+            document.getElementById('recordingIndicator').style.display = 'none';
+            document.getElementById('recordingIndicator').innerHTML = `
+                <div class="recording-wave"></div>
+                <span>Grabando... Desliza para cancelar</span>
+            `;
+            if(mediaRecorder?.stream) {
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
         }
 
+        // Sistema de mensajes
         window.sendMessage = async function() {
-            const messageInput = document.getElementById('messageInput');
-            const text = messageInput.value.trim();
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
             
-            if (text && username) {
+            if(text && username) {
                 try {
                     await push(messagesRef, {
                         user: username,
                         text: text,
                         timestamp: serverTimestamp()
                     });
-                    messageInput.value = '';
+                    input.value = '';
                 } catch (error) {
-                    console.error("Error al enviar:", error);
+                    console.error("Error enviando mensaje:", error);
                 }
             }
         };
@@ -296,24 +354,23 @@
             
             messageElement.className = `message ${data.user === username ? 'sent' : ''}`;
             
-            if (data.type === 'audio') {
+            if(data.type === 'audio') {
                 messageElement.innerHTML = `
                     <div class="audio-message">
-                        <audio class="audio-player" controls>
-                            <source src="${data.url}" type="audio/webm">
+                        <audio controls style="width: 200px;">
+                            <source src="${data.url}" type="audio/mp3">
                         </audio>
-                        <span>${data.duration}s</span>
                     </div>
-                    <small style="display: block; margin-top: 6px; opacity: 0.7;">
-                        ${new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <small style="opacity: 0.7; display: block; margin-top: 8px;">
+                        ${new Date(data.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                     </small>
                 `;
             } else {
                 messageElement.innerHTML = `
                     <strong>${data.user}</strong>
-                    <div style="margin-top: 4px;">${data.text}</div>
-                    <small style="display: block; margin-top: 6px; opacity: 0.7;">
-                        ${new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div style="margin: 8px 0;">${data.text}</div>
+                    <small style="opacity: 0.7;">
+                        ${new Date(data.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                     </small>
                 `;
             }
@@ -322,26 +379,24 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
+        // Borrar chat
         async function clearChat() {
-            if (confirm('¿Estás seguro de borrar todo el historial?')) {
+            if(confirm('¿Borrar todo el historial de chat?')) {
                 try {
                     await remove(messagesRef);
                     document.getElementById('messages').innerHTML = '';
                 } catch (error) {
-                    console.error('Error borrando mensajes:', error);
+                    console.error("Error borrando mensajes:", error);
                 }
             }
         }
 
-        window.addEventListener('beforeunload', () => {
-            localStorage.removeItem('chatMessages');
+        // Enviar con Enter
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
         });
     </script>
 
