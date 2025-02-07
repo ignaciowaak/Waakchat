@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Anónimo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+            flex-direction: column;
+        }
+
+        #userPrompt {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #chat-container {
+            display: none;
+            width: 300px;
+            padding: 20px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+
+        #messageInput {
+            width: 80%;
+            padding: 5px;
+        }
+
+        button {
+            padding: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="userPrompt">
+        <h2>Introduce tu usuario</h2>
+        <input type="text" id="usernameInput" placeholder="Tu nombre">
+        <button onclick="setUsername()">OK</button>
+    </div>
+
+    <div id="chat-container">
+        <h2>Chat Anónimo</h2>
+        <div id="messages"></div>
+        <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
+
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_USvfSXAqZf7hQhJCon0WulnrrINB7cI",
+            authDomain: "the-pic-c437e.firebaseapp.com",
+            projectId: "the-pic-c437e",
+            storageBucket: "the-pic-c437e.appspot.com",
+            messagingSenderId: "750954597180",
+            appId: "1:750954597180:web:d7b67c6b60f4d3bb17ec39"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const messagesRef = ref(db, "messages");
+
+        let username = "";
+
+        // Función para establecer el nombre de usuario
+        window.setUsername = function () {
+            const input = document.getElementById("usernameInput").value.trim();
+            if (input !== "") {
+                username = input;
+                document.getElementById("userPrompt").style.display = "none";
+                document.getElementById("chat-container").style.display = "block";
+            } else {
+                alert("Por favor, introduce un nombre de usuario.");
+            }
+        };
+
+        // Función para enviar mensajes
+        window.sendMessage = function () {
+            const messageInput = document.getElementById("messageInput");
+            if (messageInput.value.trim() !== "") {
+                push(messagesRef, {
+                    user: username,
+                    text: messageInput.value,
+                    timestamp: Date.now()
+                });
+                messageInput.value = "";
+            }
+        };
+
+        // Escuchar mensajes en tiempo real
+        onChildAdded(messagesRef, (snapshot) => {
+            const data = snapshot.val();
+            const messagesDiv = document.getElementById("messages");
+            const messageElement = document.createElement("p");
+            messageElement.textContent = `${data.user}: ${data.text}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+    </script>
+
+</body>
+</html>
